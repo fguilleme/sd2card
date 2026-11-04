@@ -4,6 +4,18 @@
 
 Application tactile pour copier une carte SD vers un disque USB, vérifier les fichiers, puis proposer le formatage de la carte en FAT32 et l'éjection des deux supports. L'interface fonctionne directement sur le framebuffer Linux, **sans X ni Wayland**.
 
+## Captures d'écran
+
+Captures réelles du framebuffer du Pi, en 480 × 320 pixels.
+
+| Carte SD détectée — Français | Écran d'attente — English |
+| --- | --- |
+| ![Carte SD de 31,3 Go détectée dans l'interface française](docs/screenshots/sd-detected-fr.png) | ![Écran d'attente de l'interface anglaise](docs/screenshots/home-en.png) |
+
+Le choix de langue est enregistré pour les prochains démarrages :
+
+![Choix persistant de la langue Français ou English](docs/screenshots/language-selection.png)
+
 ## Matériel et système utilisés
 
 - Raspberry Pi 4 sous Raspberry Pi OS / Debian 13, en session console.

@@ -4,6 +4,18 @@
 
 Touchscreen application that copies an SD card to a USB drive, verifies the files, then offers to format the card as FAT32 and eject both devices. The interface uses the Linux framebuffer directly, **without X or Wayland**.
 
+## Screenshots
+
+Actual captures of the Pi's framebuffer at 480 × 320 pixels.
+
+| SD card detected — Français | Waiting for media — English |
+| --- | --- |
+| ![A 31.3 GB SD card detected in the French interface](docs/screenshots/sd-detected-fr.png) | ![Waiting screen in the English interface](docs/screenshots/home-en.png) |
+
+The language choice is saved for subsequent boots:
+
+![Persistent language selection: Français or English](docs/screenshots/language-selection.png)
+
 ## Hardware and system in use
 
 - Raspberry Pi 4 running Raspberry Pi OS / Debian 13 in a console session.
