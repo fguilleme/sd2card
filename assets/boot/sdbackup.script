@@ -1,0 +1,11 @@
+Window.SetBackgroundTopColor(0.062745, 0.125490, 0.176471);
+Window.SetBackgroundBottomColor(0.062745, 0.125490, 0.176471);
+image = Image("background.png");
+width = Window.GetWidth();
+height = Window.GetHeight();
+scale = width / image.GetWidth();
+if (height / image.GetHeight() < scale)
+    scale = height / image.GetHeight();
+image = image.Scale(image.GetWidth() * scale, image.GetHeight() * scale);
+sprite = Sprite(image);
+sprite.SetPosition((width - image.GetWidth()) / 2, (height - image.GetHeight()) / 2, -100);

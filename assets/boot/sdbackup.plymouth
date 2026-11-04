@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Sauvegarde SD
+Description=Écran de démarrage Sauvegarde SD
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/sdbackup
+ScriptFile=/usr/share/plymouth/themes/sdbackup/sdbackup.script

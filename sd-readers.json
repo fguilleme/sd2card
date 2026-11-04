@@ -1,0 +1,16 @@
+[
+  {
+    "description": "Lecteur SD branché et identifié par l’utilisateur le 3 novembre 2026",
+    "ID_VENDOR_ID": "349c",
+    "ID_MODEL_ID": "0418",
+    "ID_SERIAL_SHORT": "20240418000000",
+    "ID_PATH_TAG": "platform-fd500000_pcie-pci-0000_01_00_0-usb-0_1_2_1_0-scsi-0_0_0_0"
+  },
+  {
+    "ID_VENDOR_ID": "05e3",
+    "ID_MODEL_ID": "0747",
+    "ID_SERIAL_SHORT": "000000000819",
+    "ID_PATH_TAG": "platform-fd500000_pcie-pci-0000_01_00_0-usb-0_1_1_0-scsi-0_0_0_0",
+    "description": "Lecteur SD Genesys Logic branché et identifié par l’utilisateur le 4 novembre 2026"
+  }
+]
