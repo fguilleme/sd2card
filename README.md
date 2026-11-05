@@ -121,8 +121,8 @@ Il s'agit d'une copie des fichiers, pas d'une image secteur : les secteurs d'amo
 
 ## Contrôles avant effacement
 
-- Exclusion des disques système, du swap, des volumes chiffrés/LVM, des supports à plusieurs partitions et des montages hors `/media` ou `/run/media`.
-- Chaque support doit posséder une seule partition avec un système de fichiers reconnu, un UUID et un accès en écriture. Les supports vierges ne sont pas partitionnés automatiquement.
+- Exclusion des disques système, du swap, des volumes chiffrés/LVM, des supports à plusieurs partitions de données et des montages hors `/media` ou `/run/media`.
+- Chaque support doit posséder une seule partition de données avec un système de fichiers reconnu, un UUID et un accès en écriture. Les supports vierges ne sont pas partitionnés automatiquement.
 - Contrôle de l'identité du support, de la génération du périphérique, des points de montage et de la protection en lecture seule de la source.
 - Contrôle de l'espace disponible ; refus des fichiers de plus de 4 Gio lorsque le disque de destination est en FAT.
 - Refus des liens symboliques et fichiers spéciaux.
@@ -177,3 +177,13 @@ Ont été vérifiés sur le matériel : framebuffer RGB565, lecture exclusive du
 **Un cycle complet copie / vérification / formatage / éjection sur des supports de test reste à valider.**
 
 Cette version contient l'application framebuffer et ses outils de mise en place. Les anciens essais d'interface sous X et les expérimentations USB ne font pas partie de cette version.
+
+### Disques de destination : NTFS et APFS
+
+- **NTFS : écriture et relecture de vérification** via UDisks et les pilotes Linux installés (`ntfs-3g` est installé sur ce Pi). Les fichiers de plus de 4 Gio sont acceptés. Un disque passé en lecture seule provoque un arrêt ; aucune réparation forcée ni suppression d'hibernation Windows n'est effectuée.
+- **APFS : écriture non prise en charge**. Les pilotes libres d'écriture restent expérimentaux avec un risque de corruption ([linux-apfs-rw](https://github.com/linux-apfs/linux-apfs-rw)). Le pilote commercial [Paragon](https://www.paragon-software.com/us/home/apfs-linux/) standard cible x86/x86-64 ; une version ARM nécessite un accord spécifique avec le fournisseur. Pour un disque partagé entre Mac et Pi, utiliser exFAT, après sauvegarde préalable de ses données.
+- Un disque de destination peut comporter une partition de données et des partitions auxiliaires GPT EFI/Microsoft réservées. Plusieurs partitions de données restent refusées. La carte SD doit toujours avoir une seule partition.
+
+Validation sur ce Pi : écriture de fichiers et dossier vide dans une image NTFS, puis double vérification SHA-256. Le montage d'un disque physique NTFS reste à valider avec un tel disque branché. Aucun support utilisateur n'a été formaté pour ce test.
+
+Dans Réglages → Orientation, choisissez Paysage (0°), Portrait (90°), Paysage inversé (180°) ou Portrait inversé (270°). En portrait, les indicateurs SD et disque sont empilés pour conserver une interface lisible. L’image et le tactile pivotent ensemble ; le choix est conservé au redémarrage dans `settings.json`, indépendamment de la calibration.

@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .copying import Cancelled
 from .devices import discover
 from .i18n import LANGUAGES, translate
-from .preferences import load_language, save_language
+from .preferences import load_language, save_language, load_orientation, save_orientation
 from .fbdev import AffineCalibration, Calibration, Console, Framebuffer, Touchscreen
 from .operations import copy_card, eject_media, erase_card
 
@@ -43,7 +43,7 @@ class Button:
 class Screen:
     def __init__(self, app):
         self.app = app
-        self.image = Image.new('RGB', (480, 320), BG)
+        self.image = Image.new('RGB', app.screen_size, BG)
         self.draw = ImageDraw.Draw(self.image)
         self.buttons = []
 
@@ -112,6 +112,7 @@ class FramebufferApp:
         self.config_path = config_path or Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home()/'.config'))) / 'sdbackup/touch.json'
         self.settings_path = Path(settings_path) if settings_path else self.config_path.with_name('settings.json')
         self.language = load_language(self.settings_path)
+        self.orientation = load_orientation(self.settings_path)
         self.calibration = Calibration()
         self.format_ack = None
         if self.config_path.exists():
@@ -120,7 +121,7 @@ class FramebufferApp:
             except (OSError, ValueError, KeyError, TypeError):
                 logging.warning('Calibration enregistrée invalide : reprise du réglage initial')
         self.calibration_points = []
-        self.calibration_targets = [(48, 48), (431, 48), (431, 271), (48, 271), (240, 160)]
+
         self.calibration_listener = None
 
     def t(self, text):
@@ -137,6 +138,32 @@ class FramebufferApp:
             return
         self.language = language
         self.set_page('language')
+
+    def set_orientation(self, orientation):
+        if self.busy or orientation not in (0, 90, 180, 270):
+            return
+        try:
+            save_orientation(self.settings_path, orientation)
+        except OSError as exc:
+            logging.exception('Impossible d’enregistrer l’orientation')
+            self.ask('Enregistrement impossible', str(exc), lambda: None, 'Compris', single=True)
+            return
+        self.orientation = orientation
+        self.set_page('orientation')
+
+    @property
+    def screen_size(self):
+        return (320, 480) if self.orientation in (90, 270) else (480, 320)
+
+    def display_point(self, point):
+        x, y = point
+        return {0: (x, y), 90: (319-y, x),
+                180: (479-x, 319-y), 270: (y, 479-x)}[self.orientation]
+
+    def physical_point(self, point):
+        x, y = point
+        return {0: (x, y), 90: (y, 319-x),
+                180: (479-x, 319-y), 270: (479-y, x)}[self.orientation]
 
     def emit(self, kind, data):
         self.events.put((kind, data))
@@ -373,6 +400,11 @@ class FramebufferApp:
         self.receive_media(list(self.media))
         self.set_page('main')
 
+    @property
+    def calibration_targets(self):
+        w, h = self.screen_size
+        return [(48, 48), (w-49, 48), (w-49, h-49), (48, h-49), (w//2, h//2)]
+
     def calibrate(self):
         if self.busy:
             return
@@ -385,7 +417,8 @@ class FramebufferApp:
         self.calibration_points.append(raw)
         if len(self.calibration_points) == len(self.calibration_targets):
             try:
-                calibration = AffineCalibration.fit(self.calibration_points, self.calibration_targets)
+                calibration = AffineCalibration.fit(self.calibration_points,
+                    [self.physical_point(p) for p in self.calibration_targets])
                 self.config_path.parent.mkdir(parents=True, exist_ok=True)
                 temp = self.config_path.with_suffix('.tmp')
                 with open(temp, 'w') as handle:
@@ -402,6 +435,8 @@ class FramebufferApp:
         self.dirty = True
 
     def handle_touch(self, kind, point, raw=None):
+        if point is not None:
+            point = self.display_point(point)
         if kind == 'cancel':
             self.pressed = None
             self.dirty = True
@@ -433,6 +468,8 @@ class FramebufferApp:
                     current.action()
 
     def render(self):
+        if self.orientation in (90, 270):
+            return self.render_portrait()
         screen = Screen(self)
         if self.page == 'stopped':
             screen.text(self.status, (8, 56, 472, 112), 24, bold=True)
@@ -461,8 +498,16 @@ class FramebufferApp:
             screen.text('Réglages', (8, 3, 472, 35), 21, bold=True)
             screen.button('calibrate', 'Calibrer le tactile', (8, 52, 472, 112), self.calibrate)
             screen.button('language', self.t('Langue') + (': ' if self.language == 'en' else ' : ') + LANGUAGES[self.language],
-                          (8, 124, 472, 184), lambda: self.set_page('language'), localize=False)
+                          (8, 116, 472, 172), lambda: self.set_page('language'), localize=False)
+            screen.button('orientation', 'Orientation', (8, 180, 472, 236), lambda: self.set_page('orientation'))
             screen.button('back', 'Retour', (8, 254, 472, 314), lambda: self.set_page('main'))
+        elif self.page == 'orientation':
+            screen.text('Orientation', (8, 3, 472, 35), 21, bold=True)
+            for i, (angle, label) in enumerate(self.orientation_choices()):
+                y = 42 + i*50
+                screen.button('orientation-'+str(angle), label, (8, y, 472, y+44),
+                              lambda a=angle: self.set_orientation(a), primary=self.orientation == angle)
+            screen.button('back', 'Retour', (8, 254, 472, 314), lambda: self.set_page('settings'))
         elif self.page == 'language':
             screen.text('Langue', (8, 3, 472, 35), 21, bold=True)
             screen.button('language-fr', 'Français', (8, 52, 472, 112),
@@ -517,7 +562,107 @@ class FramebufferApp:
             screen.button('settings', 'Réglages', (338, 268, 472, 316), lambda: self.set_page('settings'), not self.busy)
         self.buttons = screen.buttons
         self.dirty = False
-        return screen.image
+        return screen.image.rotate(180) if self.orientation == 180 else screen.image
+
+    @staticmethod
+    def orientation_choices():
+        return [(0, 'Paysage (0°)'), (90, 'Portrait (90°)'),
+                (180, 'Paysage inversé (180°)'), (270, 'Portrait inversé (270°)')]
+
+    def render_portrait(self):
+        screen = Screen(self)
+        def text(value, rect, size=17, **kwargs):
+            screen.text(value, rect, size, **kwargs)
+        def button(key, label, y, action, **kwargs):
+            screen.button(key, label, (8, y, 312, y+56), action, **kwargs)
+        def back(page='main'):
+            button('back', 'Retour', 416, lambda: self.set_page(page))
+        if self.page == 'settings':
+            text('Réglages', (8, 4, 312, 42), 21, bold=True)
+            button('calibrate', 'Calibrer le tactile', 64, self.calibrate)
+            button('language', self.t('Langue')+' : '+LANGUAGES[self.language], 140,
+                   lambda: self.set_page('language'), localize=False)
+            button('orientation', 'Orientation', 216, lambda: self.set_page('orientation'))
+            back()
+        elif self.page == 'orientation':
+            text('Orientation', (8, 4, 312, 42), 21, bold=True)
+            for i, (angle, label) in enumerate(self.orientation_choices()):
+                button('orientation-'+str(angle), label, 60+i*80,
+                       lambda a=angle: self.set_orientation(a), primary=self.orientation == angle)
+            back('settings')
+        elif self.page == 'language':
+            text('Langue', (8, 4, 312, 42), 21, bold=True)
+            for i, (code, label) in enumerate(LANGUAGES.items()):
+                button('language-'+code, label, 80+i*80, lambda c=code: self.set_language(c),
+                       primary=self.language == code, localize=False)
+            back('settings')
+        elif self.page == 'calibrate':
+            index = len(self.calibration_points)
+            text(f'Calibration {index+1}/5 : touchez la cible', (0, 0, 320, 32), 13, maxlines=1)
+            x, y = self.calibration_targets[index]
+            screen.draw.ellipse((x-23, y-23, x+23, y+23), outline=GREEN, width=3)
+            screen.draw.line((x-14, y, x+14, y), fill=FG, width=2)
+            screen.draw.line((x, y-14, x, y+14), fill=FG, width=2)
+            screen.button('cancel-calibration', 'Annuler', (85, 272, 235, 328), lambda: self.set_page('settings'))
+        elif self.page == 'modal':
+            title, message, action, label, danger, single = self.modal
+            text(title, (8, 6, 312, 68), 20, bold=True)
+            text(message, (8, 76, 312, 310), 16, maxlines=10)
+            def accept():
+                self.set_page('main')
+                action()
+            button('accept', label, 344, accept, primary=True, danger=danger)
+            if not single:
+                back()
+        elif self.page == 'choose':
+            text('Choisir la carte SD' if self.choice_role == 'source' else 'Choisir le disque USB',
+                 (8, 4, 312, 52), 20, bold=True)
+            other = self.target if self.choice_role == 'source' else self.source
+            choices = [m for m in self.media if not other or m.disk != other.disk]
+            self.choice_offset = min(self.choice_offset, max(0, len(choices)-1))
+            for i, media in enumerate(choices[self.choice_offset:self.choice_offset+3]):
+                button('media:'+repr(media.identity), media.title, 64+i*80,
+                       lambda m=media: self.select(m), localize=False)
+            if not choices:
+                text('Aucun support disponible', (8, 80, 312, 180))
+            if len(choices) > 3:
+                def more():
+                    self.choice_offset = (self.choice_offset+3) % len(choices)
+                    self.dirty = True
+                button('more', 'Suite', 320, more)
+            back()
+        elif self.page == 'stopped':
+            text(self.status, (8, 60, 312, 160), 23, bold=True)
+            text('Pour relancer depuis le terminal :', (8, 190, 312, 260))
+            text('./run-framebuffer.sh', (8, 280, 312, 350), 20, color=GREEN)
+        else:
+            text('SAUVEGARDE SD', (8, 0, 312, 32), 21, bold=True)
+            for role, media, title, y in [('source', self.source, 'CARTE SD', 40),
+                                          ('target', self.target, 'DISQUE USB', 140)]:
+                rect = (8, y, 312, y+92)
+                screen.draw.rounded_rectangle(rect, radius=8, fill=PANEL)
+                text(title, (8, y+2, 312, y+26), 16, bold=True, color=GREEN if media else AMBER)
+                label = (f'{media.label}\n{media.size/10**9:.1f} '+('GB' if self.language == 'en' else 'Go')+f' · {media.partition}') if media else ('Toucher pour choisir' if self.media else ('Non détectée' if role == 'source' else 'Non détecté'))
+                text(label, (8, y+28, 312, y+90), 14, maxlines=3, localize=media is None)
+                screen.buttons.append(Button(role, rect, lambda r=role: self.choose(r), not self.busy and self.state != 'verified'))
+            text(self.status, (8, 238, 312, 278), 16, bold=True)
+            text(self.detail, (8, 280, 312, 318), 13, localize=not self.detail_is_data)
+            screen.draw.rounded_rectangle((8, 322, 312, 332), radius=4, fill=PANEL)
+            if self.percent:
+                screen.draw.rounded_rectangle((8, 322, 8+max(4, round(304*self.percent/100)), 332), radius=4, fill=GREEN)
+            ready = bool(self.source and self.target and self.source.disk != self.target.disk)
+            button('erase' if self.state == 'verified' else 'copy',
+                   'Effacer la SD et éjecter' if self.state == 'verified' else 'Lancer la copie', 340,
+                   self.confirm_erase if self.state == 'verified' else self.start_copy,
+                   enabled=ready and not self.busy, primary=True)
+            screen.button('cancel' if self.busy else 'eject', 'Annuler' if self.busy else 'Éjecter sans effacer',
+                          (8, 408, 198, 472), self.cancel_work if self.busy else self.eject,
+                          self.cancellable if self.busy else bool(self.source or self.target))
+            screen.button('settings', 'Réglages', (206, 408, 312, 472),
+                          lambda: self.set_page('settings'), not self.busy)
+        self.buttons = screen.buttons
+        self.dirty = False
+        return screen.image.rotate(self.orientation, expand=True)
 
 
 def main():

@@ -75,7 +75,7 @@ def known_sd_reader(properties, readers, connected=None):
 
 def discover():
     raw = subprocess.check_output(['lsblk', '--tree', '-J', '-b', '-o',
-        'PATH,TYPE,SIZE,FSTYPE,LABEL,UUID,MOUNTPOINTS,TRAN,RM,RO,MODEL,SERIAL,MAJ:MIN'], timeout=10)
+        'PATH,TYPE,SIZE,FSTYPE,LABEL,UUID,MOUNTPOINTS,TRAN,RM,RO,MODEL,SERIAL,MAJ:MIN,PARTTYPE'], timeout=10)
     result = []
     readers = load_sd_readers()
     connected = usb_reader_counts()
@@ -88,14 +88,17 @@ def discover():
             for child in n.get('children', []):
                 walk(child)
         walk(disk)
-        # Exclude system disks, swap, encrypted/LVM and multi-partition media.
+        # Exclude system mounts and layered devices; allow standard GPT auxiliaries.
         if any(m and not m.startswith(('/media/', '/run/media/'))
                for n in nodes for m in n.get('mountpoints', [])):
             continue
         parts = [n for n in nodes if n['type'] == 'part']
-        if len(parts) != 1 or len(nodes) != 2:
+        auxiliary = {'c12a7328-f81f-11d2-ba4b-00a0c93ec93b',
+                     'e3c9e316-0b5c-4db8-817d-f92df00215ae'}
+        data = [p for p in parts if (p.get('parttype') or '').lower() not in auxiliary]
+        if len(data) != 1 or len(nodes) != len(parts) + 1:
             continue
-        part = parts[0]
+        part = data[0]
         if not part['uuid'] or not part['fstype'] or part['ro']:
             continue
         name = os.path.basename(disk['path'])
@@ -109,7 +112,11 @@ def discover():
         properties = dict(line.split('=', 1) for line in props.splitlines() if '=' in line)
         sd = (properties.get('ID_DRIVE_FLASH_SD') == '1' or disk['tran'] == 'mmc'
               or known_sd_reader(properties, readers, connected))
-        identity = (disk['path'], sequence, disk['serial'], disk['size'], part['uuid'])
+        # SD formatting remains restricted to a single-partition card.
+        if sd and len(parts) != 1:
+            continue
+        layout = tuple((p['path'], p.get('parttype'), p.get('uuid')) for p in parts)
+        identity = (disk['path'], sequence, disk['serial'], disk['size'], part['uuid'], layout)
         result.append(Media(disk['path'], part['path'], identity, part['uuid'],
                             part['label'] or disk['model'] or name,
                             int(part['size']), part['fstype'], sd))

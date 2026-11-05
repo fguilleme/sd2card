@@ -10,18 +10,22 @@ from .devices import SafetyError, Storage, assert_present
 
 
 def copy_card(source, target, cancel, progress):
+    if target.filesystem.lower() == 'apfs':
+        raise SafetyError('Écriture APFS non prise en charge sur ce Raspberry Pi. Utilisez un disque en exFAT ou NTFS.')
     storage = Storage()
     storage.validate_pair(source, target)
     src = storage.mount(source, readonly=True)
     if not os.statvfs(src).f_flag & os.ST_RDONLY:
         raise SafetyError('La carte ne peut pas être protégée en lecture seule.')
     dst = storage.mount(target)
+    if os.statvfs(dst).f_flag & os.ST_RDONLY:
+        raise SafetyError('Disque en lecture seule. Pour NTFS, arrêtez complètement Windows et vérifiez le disque sous Windows.')
     if os.stat(src).st_dev == os.stat(dst).st_dev:
         raise SafetyError('La source et la destination désignent le même support.')
     if target.filesystem == 'vfat':
         files, _ = inventory(Path(src), cancel)
         if any(size > 2**32 - 1 for size, _ in files.values()):
-            raise SafetyError('Un fichier dépasse 4 Go : utilisez un disque USB en exFAT ou ext4.')
+            raise SafetyError('Un fichier dépasse 4 Go : utilisez un disque USB en exFAT, NTFS ou ext4.')
     src_device, dst_device = os.stat(src).st_dev, os.stat(dst).st_dev
     last_check = [0]
     def guard():
@@ -31,6 +35,8 @@ def copy_card(source, target, cancel, progress):
             last_check[0] = time.monotonic()
         if os.stat(src).st_dev != src_device or os.stat(dst).st_dev != dst_device:
             raise SafetyError('Un support a été démonté pendant le travail.')
+        if os.statvfs(dst).f_flag & os.ST_RDONLY:
+            raise SafetyError('Le disque de destination est passé en lecture seule.')
         if not os.statvfs(src).f_flag & os.ST_RDONLY:
             raise SafetyError('La protection en lecture seule de la carte a changé.')
     backup = Backup(src, dst, cancel, progress, guard)

@@ -4,6 +4,17 @@ import re
 LANGUAGES = {'fr': 'Français', 'en': 'English'}
 
 ENGLISH = {
+    'Paysage (0°)': 'Landscape (0°)',
+    'Portrait (90°)': 'Portrait (90°)',
+    'Paysage inversé (180°)': 'Landscape inverted (180°)',
+    'Portrait inversé (270°)': 'Portrait inverted (270°)',
+    'Orientation': 'Orientation',
+    'Normale (0°)': 'Normal (0°)',
+    'Inversée (180°)': 'Upside down (180°)',
+    'Écriture APFS non prise en charge sur ce Raspberry Pi. Utilisez un disque en exFAT ou NTFS.': 'APFS writing is not supported on this Raspberry Pi. Use an exFAT or NTFS drive.',
+    'Disque en lecture seule. Pour NTFS, arrêtez complètement Windows et vérifiez le disque sous Windows.': 'Drive is read-only. For NTFS, fully shut down Windows and check the drive in Windows.',
+    'Le disque de destination est passé en lecture seule.': 'The destination drive became read-only.',
+    'Un fichier dépasse 4 Go : utilisez un disque USB en exFAT, NTFS ou ext4.': 'A file exceeds 4 GB: use an exFAT, NTFS or ext4 USB drive.',
     'SAUVEGARDE SD': 'SD BACKUP',
     'Réglages': 'Settings',
     'Langue': 'Language',

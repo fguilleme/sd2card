@@ -87,6 +87,23 @@ class DevicesTests(unittest.TestCase):
         item['children'].append(dict(item['children'][0], path='/dev/sda2'))
         self.assertEqual(self.scan([item]), [])
 
+    def test_ntfs_with_reserved_partition_supported_as_destination(self):
+        item = disk()
+        item['children'][0]['fstype'] = 'ntfs'
+        item['children'].append(dict(item['children'][0], path='/dev/sda2',
+                                    uuid=None, fstype=None,
+                                    parttype='e3c9e316-0b5c-4db8-817d-f92df00215ae'))
+        self.assertEqual(len(self.scan([item], props='ID_BUS=usb')), 1)
+        # Never broaden eligibility for SD formatting.
+        self.assertEqual(self.scan([item]), [])
+
+    def test_efi_does_not_hide_system_mount(self):
+        item = disk()
+        item['children'].append(dict(item['children'][0], path='/dev/sda2',
+            parttype='c12a7328-f81f-11d2-ba4b-00a0c93ec93b',
+            mountpoints=['/boot/efi']))
+        self.assertEqual(self.scan([item], props='ID_BUS=usb'), [])
+
     def test_unpartitioned_refused(self):
         item = disk()
         item['children'] = []

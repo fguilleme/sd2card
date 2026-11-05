@@ -121,8 +121,8 @@ This is a file backup, not a sector image: boot sectors and Unix permissions are
 
 ## Checks before erasing
 
-- System disks, swap, encrypted/LVM volumes, multi-partition media and mounts outside `/media` or `/run/media` are excluded.
-- Each device must have one partition with a recognized filesystem, a UUID and write access. Blank media are not partitioned automatically.
+- System disks, swap, encrypted/LVM volumes, media with multiple data partitions and mounts outside `/media` or `/run/media` are excluded.
+- Each device must have one data partition with a recognized filesystem, a UUID and write access. Blank media are not partitioned automatically.
 - Device identity, kernel device generation, mount locations and source read-only protection are checked.
 - Free space is checked; files exceeding 4 GiB are refused when the destination uses FAT.
 - Symbolic links and special files are refused.
@@ -177,3 +177,13 @@ Hardware checks completed: RGB565 framebuffer output, exclusive ADS7846 input, c
 **A complete copy / verification / format / eject cycle using test media still needs validation.**
 
 This version contains the framebuffer application and its setup tools. Earlier X interface experiments and USB timing experiments are outside this version.
+
+### Destination drives: NTFS and APFS
+
+- **NTFS: writing and verification reads** through UDisks and installed Linux drivers (`ntfs-3g` is installed on this Pi). Files over 4 GiB are supported. A read-only destination stops the operation; Windows hibernation is never removed and no forced repair is attempted.
+- **APFS writing is unsupported**. Free write drivers remain experimental with a corruption risk ([linux-apfs-rw](https://github.com/linux-apfs/linux-apfs-rw)). The standard commercial [Paragon driver](https://www.paragon-software.com/us/home/apfs-linux/) targets x86/x86-64; ARM requires a specific vendor agreement. For a drive shared by a Mac and Pi, use exFAT after backing up its existing data.
+- Destination drives may have one data partition plus GPT EFI/Microsoft reserved auxiliary partitions. Multiple data partitions remain excluded. SD cards must still have exactly one partition.
+
+Validated on this Pi: file and empty-directory writes to an NTFS image, followed by double SHA-256 verification. Mounting a physical NTFS drive still needs validation with such a drive connected. No user device was formatted for this test.
+
+In Settings → Orientation, choose Landscape (0°), Portrait (90°), Landscape inverted (180°) or Portrait inverted (270°). Portrait mode stacks the SD and drive indicators to keep the interface readable. Display and touch rotate together; the choice persists across restarts in `settings.json`, independently of calibration.

@@ -4,7 +4,7 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 from types import SimpleNamespace
-from sdbackup.operations import erase_card
+from sdbackup.operations import erase_card, copy_card
 from sdbackup.copying import Cancelled
 from sdbackup.devices import SafetyError
 
@@ -38,6 +38,22 @@ class WorkflowTests(unittest.TestCase):
             patcher = patch(target, **kwargs)
             patcher.start()
             self.addCleanup(patcher.stop)
+
+    def test_apfs_destination_refused_before_mounting(self):
+        target = SimpleNamespace(filesystem='apfs')
+        with self.assertRaisesRegex(SafetyError, 'APFS'):
+            copy_card(self.app.pair[0], target, self.app.cancel, Mock())
+        self.storage.mount.assert_not_called()
+
+    def test_readonly_ntfs_destination_refused_before_copying(self):
+        target = SimpleNamespace(filesystem='ntfs')
+        self.storage.mount.side_effect = ['/source', '/target']
+        with patch('sdbackup.operations.os.statvfs',
+                   return_value=SimpleNamespace(f_flag=1)), \
+             patch('sdbackup.operations.Backup') as backup:
+            with self.assertRaisesRegex(SafetyError, 'lecture seule'):
+                copy_card(self.app.pair[0], target, self.app.cancel, Mock())
+            backup.assert_not_called()
 
     def test_verify_and_both_unmounts_precede_format(self):
         self.app.erase()
